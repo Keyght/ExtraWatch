@@ -17,10 +17,10 @@ public class Watch : MonoBehaviour
         var nowTime = DateTime.Now;
         SetClockTo(new DayData(nowTime.Hour, nowTime.Minute, nowTime.Second));
         _gmtOffset = TimeZoneInfo.Local.BaseUtcOffset.Hours;
-        RapidApiGet();
+        RapidApiSetTime();
     }
 
-    private async Task RapidApiGet()
+    private async Task RapidApiSetTime()
     {
         var client = new HttpClient();
         var request = new HttpRequestMessage
@@ -40,7 +40,7 @@ public class Watch : MonoBehaviour
         if (response.Headers.Date != null)
         {
             var headers = response.Headers.Date.Value;
-            var dayTime = new DayData(headers.Hour, headers.Minute, headers.Second);
+            var dayTime = new DayData(headers.Hour + _gmtOffset, headers.Minute, headers.Second);
             SetClockTo(dayTime);
             Debug.Log("RapidApi sets time to: " + dayTime);
         }
