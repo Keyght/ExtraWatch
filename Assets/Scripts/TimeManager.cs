@@ -1,9 +1,8 @@
 using System;
-using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Networking;
 
 public class TimeManager : MonoBehaviour
 {
@@ -13,79 +12,104 @@ public class TimeManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI _hour;
     [SerializeField] private TextMeshProUGUI _minute;
     [SerializeField] private TextMeshProUGUI _second;
-    
+    [SerializeField] private float _apiRequestTimeInHours;
+
     private int _gmtOffset;
 
-    public DayData CurrentTime => new DayData(int.Parse(_hour.text), int.Parse(_minute.text), int.Parse(_second.text));
+    private CancellationTokenSource _cts;
 
+    private DayData CurrentTime => new DayData(int.Parse(_hour.text), int.Parse(_minute.text), int.Parse(_second.text));
+
+    private void Awake()
+    {
+        _cts = new CancellationTokenSource();
+    }
 
     private void Start()
     {
-        var nowTime = DateTime.Now;
-        SetClockTo(new DayData(nowTime.Hour, nowTime.Minute, nowTime.Second));
         _gmtOffset = TimeZoneInfo.Local.BaseUtcOffset.Hours;
-        TimeApi();
-        WorldClockApi();
+        CorrectTime(_cts.Token);
+        TickTime(_cts.Token);
     }
 
-    private async Task TimeApi()
+    private async Task TickTime(CancellationToken token)
     {
-        using var webRequest = UnityWebRequest.Get("https://timeapi.io/api/Time/current/zone?timeZone=Europe/London");
-        webRequest.SendWebRequest();
-        while (!webRequest.isDone)
+        var time = 1f;
+        const float secondOnEuler = 360 / 60f;
+        var secChange = false;
+        while (!token.IsCancellationRequested)
         {
+            time -= Time.deltaTime;
+            if (time <= 0)
+            {
+                _secondArrow.Rotate(0, 0, secondOnEuler);
+                _second.SetText(((int.Parse(_second.text) + 1) % 60).ToString());
+                time += 1f;
+                secChange = true;
+            }
+
+            if (secChange && Math.Abs(_secondArrow.localRotation.z) < 0.01)
+            {
+                _minuteArrow.Rotate(0, 0, secondOnEuler);
+                _minute.SetText(((int.Parse(_minute.text) + 1) % 60).ToString());
+                _hourArrow.Rotate(0, 0, secondOnEuler / 12f);
+                _hour.SetText(((int.Parse(_hour.text) + 1) % 24).ToString());
+                secChange = false;
+            }
+
             await Task.Yield();
         }
-
-        var dayData = JsonUtility.FromJson<DayData>(webRequest.downloadHandler.text);
-        dayData.hour = (dayData.hour + _gmtOffset) % 24;
-        SetClockTo(dayData);
-        Debug.Log("TimeApi sets time to: " + dayData);
     }
 
-    private async Task WorldClockApi()
+    private async Task CorrectTime(CancellationToken token)
     {
-        var client = new HttpClient();
-        var request = new HttpRequestMessage
+        while (!token.IsCancellationRequested)
         {
-            Method = HttpMethod.Get,
-            RequestUri = new Uri("https://world-clock.p.rapidapi.com/json/utc/now"),
-            Headers =
+            var dayData = await TimeApi.TimeApiGet();
+            dayData.hour = (dayData.hour + _gmtOffset) % 24;
+            if (!dayData.Equals(CurrentTime))
+                SetClockTo(dayData);
+
+            dayData = await WorldClockApi.WorldClockApiGet();
+            dayData.hour = (dayData.hour + _gmtOffset) % 24;
+            if (!dayData.Equals(CurrentTime))
+                SetClockTo(dayData);
+
+            var hours = _apiRequestTimeInHours * 60 * 60;
+            while (hours > 0)
             {
-                { "X-RapidAPI-Key", "21527b769cmsh629c37f9705c479p17c42ejsn3fe796da7329" },
-                { "X-RapidAPI-Host", "world-clock.p.rapidapi.com" },
-            },
-        };
-        using var response = await client.SendAsync(request);
-        response.EnsureSuccessStatusCode();
-        var body = await response.Content.ReadAsStringAsync();
-        await Task.Yield();
-        if (response.Headers.Date != null)
-        {
-            var headers = response.Headers.Date.Value;
-            var dayData = new DayData((headers.Hour + _gmtOffset) % 24, headers.Minute, headers.Second);
-            //if (dayTime.Equals(CurrentTime))
-            SetClockTo(dayData);
-            Debug.Log("WorldClockApi sets time to: " + dayData);
+                hours -= Time.deltaTime;
+                await Task.Yield();
+            }
         }
     }
 
     private void SetClockTo(DayData dayData)
     {
-        ResetClocks();
+        _hour.SetText(dayData.hour.ToString());
+        _minute.SetText(dayData.minute.ToString());
+        _second.SetText(dayData.seconds.ToString());
+
+        ResetArrows();
         var secondsInMinute = dayData.seconds / 60f;
         _secondArrow.Rotate(0, 0, secondsInMinute * 360);
-        var minutesInHour = (dayData.minute + secondsInMinute) / 60f ;
+        var minutesInHour = dayData.minute / 60f;
         _minuteArrow.Rotate(0, 0, minutesInHour * 360);
-        var hoursInDay = (dayData.hour + minutesInHour) / 12f;        
+        var hoursInDay = (dayData.hour + minutesInHour) / 12f;
         _hourArrow.Rotate(0, 0, hoursInDay * 360);
     }
 
-    private void ResetClocks()
+    private void ResetArrows()
     {
         var firstPos = Quaternion.Euler(-90, 0, 0);
         _hourArrow.localRotation = firstPos;
         _minuteArrow.localRotation = firstPos;
         _secondArrow.localRotation = firstPos;
+    }
+
+    private void OnDestroy()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
     }
 }
