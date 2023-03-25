@@ -33,9 +33,9 @@ public class ArrowRotation : MonoBehaviour
             if (time <= 0)
             {
                 _second.Rotate(0,0, secondOnEuler);
-                time = 1f - time;
+                time += 1f;
             }
-            if (time == 1f && Math.Abs(_second.localRotation.z) < 0.01)
+            if (Math.Abs(time - 1f) < 0.01 && Math.Abs(_second.localRotation.z) < 0.01)
             {
                 _minute.Rotate(0, 0, secondOnEuler);
                 _hour.Rotate(0, 0, secondOnEuler / 12f);
