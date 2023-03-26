@@ -28,8 +28,10 @@ public class TimeManager : MonoBehaviour
     private void Start()
     {
         _gmtOffset = TimeZoneInfo.Local.BaseUtcOffset.Hours;
-        CorrectTime(_cts.Token);
+        var time = DateTime.Now;
+        SetClockTo(new DayData(time.Hour, time.Minute, time.Second));
         TickTime(_cts.Token);
+        CorrectTime(_cts.Token);
     }
 
     private async Task TickTime(CancellationToken token)

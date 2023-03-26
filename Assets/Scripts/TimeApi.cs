@@ -6,7 +6,7 @@ public static class TimeApi
 {
     public static async Task<DayData> TimeApiGet()
     {
-        using var webRequest = UnityWebRequest.Get("https://timeapi.io/api/Time/current/zone?timeZone=Europe/London");
+        using var webRequest = UnityWebRequest.Get("https://timeapi.io/api/Time/current/zone?timeZone=utc");
         webRequest.SendWebRequest();
         while (!webRequest.isDone)
         {
