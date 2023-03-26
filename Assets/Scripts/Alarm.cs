@@ -27,15 +27,26 @@ public class Alarm : MonoBehaviour
 
     private void OnWatchButtonPressed()
     {
+        _plusButton.interactable = false;
+        _minusButton.interactable = false;
         _watchButton.interactable = false;
         _clockButton.interactable = false;
+        
+        _plusButton.interactable = true;
+        _minusButton.interactable = true;
+        _watchButton.interactable = true;
+        _clockButton.interactable = true;
     }
 
     private async void OnClockButtonPressed()
     {
+        _plusButton.interactable = false;
+        _minusButton.interactable = false;
         _watchButton.interactable = false;
         _clockButton.interactable = false;
         await ClockAlarm();
+        _plusButton.interactable = true;
+        _minusButton.interactable = true;
         _watchButton.interactable = true;
         _clockButton.interactable = true;
     }
