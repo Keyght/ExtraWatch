@@ -17,11 +17,15 @@ public class TimeManager : MonoBehaviour
     private int _gmtOffset;
 
     private CancellationTokenSource _cts;
+    private static TimeManager _instance;
 
-    private DayData CurrentTime => new DayData(int.Parse(_hour.text), int.Parse(_minute.text), int.Parse(_second.text));
+    public DayData CurrentTime => new DayData(int.Parse(_hour.text), int.Parse(_minute.text), int.Parse(_second.text));
+    public CancellationTokenSource CTS => _cts;
+    public static TimeManager Instance => _instance;
 
     private void Awake()
     {
+        _instance = this;
         _cts = new CancellationTokenSource();
     }
 
@@ -39,6 +43,7 @@ public class TimeManager : MonoBehaviour
         var time = 1f;
         const float secondOnEuler = 360 / 60f;
         var secChange = false;
+        var minChange = false;
         while (!token.IsCancellationRequested)
         {
             time -= Time.deltaTime;
@@ -55,8 +60,13 @@ public class TimeManager : MonoBehaviour
                 _minuteArrow.Rotate(0, 0, secondOnEuler);
                 _minute.SetText(((int.Parse(_minute.text) + 1) % 60).ToString());
                 _hourArrow.Rotate(0, 0, secondOnEuler / 12f);
-                _hour.SetText(((int.Parse(_hour.text) + 1) % 24).ToString());
+                minChange = true;
                 secChange = false;
+            }
+            if (minChange && int.Parse(_minute.text) == 0)
+            {
+                _hour.SetText(((int.Parse(_hour.text) + 1) % 24).ToString());
+                minChange = false;
             }
 
             await Task.Yield();
