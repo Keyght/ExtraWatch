@@ -48,12 +48,18 @@ public class Alarm : MonoBehaviour
         alarmData.minute = string.IsNullOrWhiteSpace(_minuteInput.text) ? alarmData.minute : int.Parse(_minuteInput.text) ;
         alarmData.seconds = string.IsNullOrWhiteSpace(_secondInput.text) ? alarmData.seconds : int.Parse(_secondInput.text);
         Debug.Log("Alarm sets to: " + alarmData);
-        while (!alarmData.Equals(timeManager.CurrentTime) || !timeManager.CTS.Token.IsCancellationRequested)
+        _hourInput.text = alarmData.hour.ToString();
+        _minuteInput.text = alarmData.minute.ToString();
+        _secondInput.text = alarmData.seconds.ToString();
+        while (!alarmData.Equals(timeManager.CurrentTime) && !timeManager.CTS.Token.IsCancellationRequested)
         {
             await Task.Yield();
         }
         _alarmUI.SetActive(true);
         StartCoroutine(ShowForSeconds(5, _alarmUI));
+        _hourInput.text = "";
+        _minuteInput.text = "";
+        _secondInput.text = "";
     }
 
     private static IEnumerator ShowForSeconds(float sec, GameObject toShow)
