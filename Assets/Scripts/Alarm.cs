@@ -5,14 +5,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Events;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class Alarm : MonoBehaviour
 {
     [SerializeField] private Transform _watch;
     [SerializeField] private Transform _watchForAlarm;
+
+    [SerializeField] private TMP_Dropdown _dropdown;
     
     [SerializeField] private Button _clockButton;
     [SerializeField] private Button _watchButton;
@@ -30,13 +30,11 @@ public class Alarm : MonoBehaviour
     [SerializeField] private GameObject _alarmUI;
 
     private bool _poinerPressed;
-    private CancellationTokenSource _cancelClockSource;
-    private CancellationTokenSource _cancelWatchSource;
+    private CancellationTokenSource _cancelAlarmSource;
 
     private void Awake()
     {
-        _cancelClockSource = new CancellationTokenSource();
-        _cancelWatchSource = new CancellationTokenSource();
+        _cancelAlarmSource = new CancellationTokenSource();
     }
 
     private void Start()
@@ -44,8 +42,8 @@ public class Alarm : MonoBehaviour
         _clockButton.onClick.AddListener(OnClockButtonPressed);
         _watchButton.onClick.AddListener(OnWatchButtonPressed);
         
-        _cancelClock.onClick.AddListener(delegate { CancelAlarm(_cancelClockSource);});
-        _cancelWatch.onClick.AddListener(delegate { CancelAlarm(_cancelWatchSource);});
+        _cancelClock.onClick.AddListener( CancelAlarm);
+        _cancelWatch.onClick.AddListener(CancelAlarm);
         
         _plusButton.onClick.AddListener(delegate { RotatePoiner(true);});
         _minusButton.onClick.AddListener(delegate { RotatePoiner(false); });
@@ -68,11 +66,23 @@ public class Alarm : MonoBehaviour
         TimeManager.RotateArrows(rotationVector, _watchForAlarm.GetChild(3), _watchForAlarm.GetChild(2));
     }
 
-    private void OnWatchButtonPressed()
+    private async void OnWatchButtonPressed()
     {
         SetInteractions(false);
-        
+        await WatchAlarm();
         SetInteractions(true);
+    }
+
+    private async Task WatchAlarm()
+    {
+        var alarmData = TimeManager.Instance.CurrentTime;
+        alarmData.hour = (int)(_watchForAlarm.GetChild(2).rotation.eulerAngles.z * 6 / 180f);
+        if (_dropdown.value == 0) alarmData.hour += 12;
+        alarmData.minute = (int)(_watchForAlarm.GetChild(3).rotation.eulerAngles.z * 30 / 180f);
+        alarmData.seconds = (int)(_watchForAlarm.GetChild(4).rotation.eulerAngles.z * 30 / 180f);
+        await Alarming(alarmData);
+        _watch.gameObject.SetActive(true);
+        _watchForAlarm.gameObject.SetActive(false);
     }
 
     private async void OnClockButtonPressed()
@@ -84,36 +94,39 @@ public class Alarm : MonoBehaviour
 
     private async Task ClockAlarm()
     {
-        var timeManager = TimeManager.Instance;
-        var alarmData = timeManager.CurrentTime;
+        var alarmData = TimeManager.Instance.CurrentTime;
         alarmData.hour = string.IsNullOrWhiteSpace(_hourInput.text) ? alarmData.hour : int.Parse(_hourInput.text);
         alarmData.minute = string.IsNullOrWhiteSpace(_minuteInput.text) ? alarmData.minute : int.Parse(_minuteInput.text) ;
         alarmData.seconds = string.IsNullOrWhiteSpace(_secondInput.text) ? alarmData.seconds : int.Parse(_secondInput.text);
-        Debug.Log("Alarm sets to: " + alarmData);
         _hourInput.text = alarmData.hour.ToString();
         _minuteInput.text = alarmData.minute.ToString();
         _secondInput.text = alarmData.seconds.ToString();
-        while (!alarmData.Equals(timeManager.CurrentTime) && !_cancelClockSource.Token.IsCancellationRequested)
-        {
-            await Task.Yield();
-        }
-        if (!_cancelClockSource.Token.IsCancellationRequested)
-        {
-            _alarmUI.SetActive(true);
-            StartCoroutine(ShowForSeconds(5, _alarmUI));
-        }
+        await Alarming(alarmData);
         _hourInput.text = "";
         _minuteInput.text = "";
         _secondInput.text = "";
     }
-    
-    private async void CancelAlarm(CancellationTokenSource source)
+
+    private async Task Alarming(DayData alarmData)
     {
-        source.Cancel();
-        await Task.Delay(1500);
-        if (source.Equals(_cancelClockSource)) _cancelClockSource = new CancellationTokenSource();
-        else _cancelWatchSource = new CancellationTokenSource();
-        source.Dispose();
+        Debug.Log("Alarm sets to: " + alarmData);
+        while (!alarmData.Equals(TimeManager.Instance.CurrentTime) && !_cancelAlarmSource.Token.IsCancellationRequested)
+        {
+            await Task.Yield();
+        }
+        if (!_cancelAlarmSource.Token.IsCancellationRequested)
+        {
+            _alarmUI.SetActive(true);
+            StartCoroutine(ShowForSeconds(5, _alarmUI));
+        }
+    }
+    
+    private async void CancelAlarm()
+    {
+        _cancelAlarmSource.Cancel();
+        await Task.Delay(1000);
+        _cancelAlarmSource.Dispose();
+        _cancelAlarmSource = new CancellationTokenSource();
     }
 
     private void SetInteractions(bool flag)
@@ -133,9 +146,7 @@ public class Alarm : MonoBehaviour
 
     private void OnDestroy()
     {
-        _cancelClockSource.Cancel();
-        _cancelWatchSource.Cancel();
-        _cancelClockSource.Dispose();
-        _cancelWatchSource.Dispose();
+        _cancelAlarmSource.Cancel();
+        _cancelAlarmSource.Dispose();
     }
 }
