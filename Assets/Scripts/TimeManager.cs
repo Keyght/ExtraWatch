@@ -59,9 +59,8 @@ public class TimeManager : MonoBehaviour
 
             if (secChange && Math.Abs(_secondArrow.localRotation.z) < 0.01)
             {
-                _minuteArrow.Rotate(0, 0, secondOnEuler);
                 _minute.SetText(((int.Parse(_minute.text) + 1) % 60).ToString());
-                _hourArrow.Rotate(0, 0, secondOnEuler / 12f);
+                RotateArrows(new Vector3(0, 0, secondOnEuler), _minuteArrow, _hourArrow);
                 minChange = true;
                 secChange = false;
             }
@@ -73,6 +72,12 @@ public class TimeManager : MonoBehaviour
 
             await Task.Yield();
         }
+    }
+
+    public static void RotateArrows(Vector3 rotationVector, Transform minuteArrow, Transform hourArrow)
+    {
+        minuteArrow.Rotate(rotationVector);
+        hourArrow.Rotate(rotationVector / 12f);
     }
 
     private async Task CorrectTime(CancellationToken token)
