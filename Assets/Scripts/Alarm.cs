@@ -1,6 +1,4 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using TMPro;
@@ -39,8 +37,8 @@ public class Alarm : MonoBehaviour
 
     private void Start()
     {
-        _clockButton.onClick.AddListener(OnClockButtonPressed);
-        _watchButton.onClick.AddListener(OnWatchButtonPressed);
+        _clockButton.onClick.AddListener(delegate { OnAlarmButtonPressed(true);});
+        _watchButton.onClick.AddListener(delegate { OnAlarmButtonPressed(false);});
         
         _cancelClock.onClick.AddListener( CancelAlarm);
         _cancelWatch.onClick.AddListener(CancelAlarm);
@@ -66,10 +64,11 @@ public class Alarm : MonoBehaviour
         TimeManager.RotateArrows(rotationVector, _watchForAlarm.GetChild(3), _watchForAlarm.GetChild(2));
     }
 
-    private async void OnWatchButtonPressed()
+    private async void OnAlarmButtonPressed(bool flag)
     {
         SetInteractions(false);
-        await WatchAlarm();
+        if (flag) await ClockAlarm();
+        else await WatchAlarm();
         SetInteractions(true);
     }
 
@@ -80,16 +79,9 @@ public class Alarm : MonoBehaviour
         if (_dropdown.value == 0) alarmData.hour += 12;
         alarmData.minute = (int)(_watchForAlarm.GetChild(3).rotation.eulerAngles.z * 30 / 180f);
         alarmData.seconds = (int)(_watchForAlarm.GetChild(4).rotation.eulerAngles.z * 30 / 180f);
-        await Alarming(alarmData);
+        await Alarming(alarmData, _cancelAlarmSource.Token);
         _watch.gameObject.SetActive(true);
         _watchForAlarm.gameObject.SetActive(false);
-    }
-
-    private async void OnClockButtonPressed()
-    {
-        SetInteractions(false);
-        await ClockAlarm();
-        SetInteractions(true);
     }
 
     private async Task ClockAlarm()
@@ -101,20 +93,20 @@ public class Alarm : MonoBehaviour
         _hourInput.text = alarmData.hour.ToString();
         _minuteInput.text = alarmData.minute.ToString();
         _secondInput.text = alarmData.seconds.ToString();
-        await Alarming(alarmData);
+        await Alarming(alarmData, _cancelAlarmSource.Token);
         _hourInput.text = "";
         _minuteInput.text = "";
         _secondInput.text = "";
     }
 
-    private async Task Alarming(DayData alarmData)
+    private async Task Alarming(DayData alarmData, CancellationToken token)
     {
         Debug.Log("Alarm sets to: " + alarmData);
-        while (!alarmData.Equals(TimeManager.Instance.CurrentTime) && !_cancelAlarmSource.Token.IsCancellationRequested)
+        while (!alarmData.Equals(TimeManager.Instance.CurrentTime) && !token.IsCancellationRequested)
         {
             await Task.Yield();
         }
-        if (!_cancelAlarmSource.Token.IsCancellationRequested)
+        if (!token.IsCancellationRequested)
         {
             _alarmUI.SetActive(true);
             StartCoroutine(ShowForSeconds(5, _alarmUI));
